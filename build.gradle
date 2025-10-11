@@ -22,8 +22,11 @@ base {
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
+boolean isRunningInIdea = System.getProperty("idea.active") == "true"
+
 neoForge {
     version = project.neo_version
+    validateAccessTransformers = true
 
     parchment {
         mappingsVersion = project.parchment_mappings_version
@@ -60,7 +63,7 @@ neoForge {
             jvmArgument "-XX:+AllowEnhancedClassRedefinition"
             jvmArgument "-XX:HotswapAgent=fatjar"
 
-            if (isRunningInIdea()) {
+            if (isRunningInIdea) {
                 systemProperty "terminal.jline", "true"
             }
         }
@@ -124,8 +127,4 @@ idea {
         downloadSources = true
         downloadJavadoc = true
     }
-}
-
-def isRunningInIdea() {
-    return System.getProperty("idea.active") == "true"
 }
