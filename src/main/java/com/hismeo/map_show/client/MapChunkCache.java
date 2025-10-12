@@ -75,6 +75,18 @@ public class MapChunkCache {
         return Math.max(2, viewDistance) + 3;
     }
 
+    public int viewCenterX() {
+        return storage.viewCenterX;
+    }
+
+    public int viewCenterZ() {
+        return storage.viewCenterZ;
+    }
+
+    public int chunkRadius() {
+        return storage.chunkRadius;
+    }
+
     static final class Storage {
         final AtomicReferenceArray<MapChunk> chunks;
         final int chunkRadius;

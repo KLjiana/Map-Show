@@ -49,9 +49,9 @@ public class ClientMap {
     public static class Events {
         @SubscribeEvent
         public static void playerInteract$RightClickItem(PlayerInteractEvent.RightClickItem event) {
-            if (FMLEnvironment.production || !(event.getLevel() instanceof ClientLevel)) return;
+            if (FMLEnvironment.production || !(event.getLevel() instanceof ClientLevel clientLevel)) return;
             if (event.getItemStack().is(Items.FILLED_MAP)) {
-                Minecraft.getInstance().setScreen(new MapScreen());
+                Minecraft.getInstance().setScreen(new MapScreen(getCurrentLevel(clientLevel)));
             }
         }
 
