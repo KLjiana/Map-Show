@@ -1,15 +1,16 @@
 package com.hismeo.map_show.client.screen;
 
-import com.hismeo.map_show.MapShow;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.network.chat.CommonComponents;
-import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import org.jetbrains.annotations.NotNull;
 
+/**
+ * @see com.hismeo.map_show.client.ClientMap#getCurrentLevel(ClientLevel) 获取MapLevel
+ */
 public class MapScreen extends Screen {
     private final LerpStorage xTran = new LerpStorage(0.0f);
     private final LerpStorage yTran = new LerpStorage(0.0f);

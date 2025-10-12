@@ -18,35 +18,29 @@ import org.jetbrains.annotations.Nullable;
  * @see net.minecraft.client.multiplayer.ClientLevel
  */
 public class MapLevel implements BlockAndTintGetter {
-    private final ResourceKey<Level> dimension;
-    private final MapChunkCache chunkSource;
-    private final DimensionSpecialEffects effects;
+    protected final ResourceKey<Level> dimension;
+    protected final MapChunkCache chunkSource;
+    protected final DimensionSpecialEffects effects;
     private final int height;
-    private final int minY;
+    private final int minBuildHeight;
 
-    public MapLevel(ResourceKey<Level> dimension, DimensionSpecialEffects effects, int viewDistance, int height, int minY) {
+    public MapLevel(ResourceKey<Level> dimension, DimensionSpecialEffects effects, int viewDistance, int height, int minBuildHeight) {
         this.dimension = dimension;
         this.chunkSource = new MapChunkCache(this, viewDistance);
         this.effects = effects;
         this.height = height;
-        this.minY = minY;
-    }
-
-    public void unload(MapChunk chunk) {}
-
-    public ResourceKey<Level> dimension() {
-        return dimension;
+        this.minBuildHeight = minBuildHeight;
     }
 
     @Override
     public float getShade(Direction direction, boolean shade) {
-        boolean flag = effects.constantAmbientLight();
+        boolean ambientLight = effects.constantAmbientLight();
         if (!shade) {
-            return flag ? 0.9F : 1.0F;
+            return ambientLight ? 0.9F : 1.0F;
         }
         return switch (direction) {
-            case DOWN -> flag ? 0.9F : 0.5F;
-            case UP -> flag ? 0.9F : 1.0F;
+            case DOWN -> ambientLight ? 0.9F : 0.5F;
+            case UP -> ambientLight ? 0.9F : 1.0F;
             case NORTH, SOUTH -> 0.8F;
             case WEST, EAST -> 0.6F;
         };
@@ -72,7 +66,8 @@ public class MapLevel implements BlockAndTintGetter {
         if (isOutsideBuildHeight(pos)) {
             return Blocks.VOID_AIR.defaultBlockState();
         }
-        return chunkSource.getChunk(pos.getX() >> 4, pos.getZ() >> 4).getBlockState(pos);
+        MapChunk chunk = chunkSource.getChunk(pos.getX() >> 4, pos.getZ() >> 4);
+        return chunk == null ? Blocks.BARRIER.defaultBlockState() : chunk.getBlockState(pos);
     }
 
     @Override
@@ -87,6 +82,10 @@ public class MapLevel implements BlockAndTintGetter {
 
     @Override
     public int getMinBuildHeight() {
-        return minY;
+        return minBuildHeight;
+    }
+
+    public MapChunkCache getChunkSource() {
+        return chunkSource;
     }
 }

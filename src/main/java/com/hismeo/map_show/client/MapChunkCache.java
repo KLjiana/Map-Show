@@ -1,12 +1,9 @@
 package com.hismeo.map_show.client;
 
-import com.hismeo.map_show.MapShow;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nullable;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 /**
@@ -21,14 +18,48 @@ public class MapChunkCache {
         this.storage = new Storage(calculateStorageRange(viewDistance));
     }
 
-    public MapChunk getChunk(int x, int z) {
+    public void updateViewCenter(int x, int z) {
+        this.storage.viewCenterX = x;
+        this.storage.viewCenterZ = z;
+    }
+
+    public void updateViewRadius(int viewDistance) {
+        int i = storage.chunkRadius;
+        int j = calculateStorageRange(viewDistance);
+        if (i != j) {
+            Storage clientchunkcache$storage = new Storage(j);
+            clientchunkcache$storage.viewCenterX = storage.viewCenterX;
+            clientchunkcache$storage.viewCenterZ = storage.viewCenterZ;
+
+            for (int k = 0; k < storage.chunks.length(); k++) {
+                MapChunk chunk = storage.chunks.get(k);
+                if (chunk != null) {
+                    ChunkPos chunkpos = chunk.getPos();
+                    if (clientchunkcache$storage.inRange(chunkpos.x, chunkpos.z)) {
+                        clientchunkcache$storage.replace(clientchunkcache$storage.getIndex(chunkpos.x, chunkpos.z), chunk);
+                    }
+                }
+            }
+
+            this.storage = clientchunkcache$storage;
+        }
+    }
+
+    public void setChunk(ChunkAccess chunkAccess, boolean copy) {
+        ChunkPos pos = chunkAccess.getPos();
+        if (storage.inRange(pos.x, pos.z)) {
+            storage.replace(storage.getIndex(pos.x, pos.z), MapChunk.fromVanilla(level, chunkAccess, copy));
+        }
+    }
+
+    public @Nullable MapChunk getChunk(int x, int z) {
         if (storage.inRange(x, z)) {
             MapChunk chunk = storage.getChunk(storage.getIndex(x, z));
             if (isValidChunk(chunk, x, z)) {
                 return chunk;
             }
         }
-        throw new NullPointerException();
+        return null;
     }
 
     private static boolean isValidChunk(@Nullable MapChunk chunk, int x, int z) {
@@ -44,7 +75,7 @@ public class MapChunkCache {
         return Math.max(2, viewDistance) + 3;
     }
 
-    final class Storage {
+    static final class Storage {
         final AtomicReferenceArray<MapChunk> chunks;
         final int chunkRadius;
         private final int viewRange;
@@ -63,24 +94,15 @@ public class MapChunkCache {
         }
 
         void replace(int chunkIndex, @Nullable MapChunk chunk) {
-            MapChunk levelchunk = chunks.getAndSet(chunkIndex, chunk);
-            if (levelchunk != null) {
+            MapChunk mapChunk = chunks.getAndSet(chunkIndex, chunk);
+            if (mapChunk != null) {
                 this.chunkCount--;
-                MapChunkCache.this.level.unload(levelchunk);
+                //MapChunkCache.this.level.unload(mapChunk);
             }
 
             if (chunk != null) {
                 this.chunkCount++;
             }
-        }
-
-        MapChunk replace(int chunkIndex, MapChunk chunk, @Nullable MapChunk replaceWith) {
-            if (chunks.compareAndSet(chunkIndex, chunk, replaceWith) && replaceWith == null) {
-                this.chunkCount--;
-            }
-
-            MapChunkCache.this.level.unload(chunk);
-            return chunk;
         }
 
         boolean inRange(int x, int z) {
@@ -90,24 +112,6 @@ public class MapChunkCache {
         @Nullable
         MapChunk getChunk(int chunkIndex) {
             return chunks.get(chunkIndex);
-        }
-
-        private void dumpChunks(String filePath) {
-            try (FileOutputStream fileoutputstream = new FileOutputStream(filePath)) {
-                int i = MapChunkCache.this.storage.chunkRadius;
-
-                for (int j = viewCenterZ - i; j <= viewCenterZ + i; j++) {
-                    for (int k = viewCenterX - i; k <= viewCenterX + i; k++) {
-                        MapChunk mapChunk = MapChunkCache.this.storage.chunks.get(MapChunkCache.this.storage.getIndex(k, j));
-                        if (mapChunk != null) {
-                            ChunkPos chunkpos = mapChunk.getPos();
-                            fileoutputstream.write((chunkpos.x + "\t" + chunkpos.z + "\n").getBytes(StandardCharsets.UTF_8));
-                        }
-                    }
-                }
-            } catch (IOException ioexception) {
-                MapShow.LOGGER.error("Failed to dump chunks to file {}", filePath, ioexception);
-            }
         }
     }
 }

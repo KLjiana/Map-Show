@@ -1,6 +1,7 @@
 package com.hismeo.map_show.client;
 
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.PalettedContainer;
 import net.minecraft.world.level.material.FluidState;
 
@@ -44,5 +45,10 @@ public record MapChunkSection(PalettedContainer<BlockState> states) {
 
     public boolean maybeHas(Predicate<BlockState> predicate) {
         return states.maybeHas(predicate);
+    }
+
+    public static MapChunkSection fromVanilla(LevelChunkSection levelChunkSection, boolean copy) {
+        PalettedContainer<BlockState> states = levelChunkSection.getStates();
+        return new MapChunkSection(copy ? states.copy() : states);
     }
 }

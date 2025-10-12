@@ -9,6 +9,8 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
 import org.jetbrains.annotations.Nullable;
@@ -84,11 +86,20 @@ public class MapChunk implements BlockGetter {
 
     @Override
     public int getHeight() {
-        return 0;
+        return level.getHeight();
     }
 
     @Override
     public int getMinBuildHeight() {
-        return 0;
+        return level.getMinBuildHeight();
+    }
+
+    public static MapChunk fromVanilla(MapLevel level, ChunkAccess chunkAccess, boolean copy) {
+        MapChunkSection[] sections = new MapChunkSection[chunkAccess.getSectionsCount()];
+        LevelChunkSection[] vanillaSections = chunkAccess.getSections();
+        for (int i = 0; i < vanillaSections.length; i++) {
+            sections[i] = MapChunkSection.fromVanilla(vanillaSections[i], copy);
+        }
+        return new MapChunk(level, chunkAccess.getPos(), sections);
     }
 }
