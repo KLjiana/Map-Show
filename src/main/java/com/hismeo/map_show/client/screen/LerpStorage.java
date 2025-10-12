@@ -2,6 +2,8 @@ package com.hismeo.map_show.client.screen;
 
 import net.minecraft.util.Mth;
 
+import java.util.Objects;
+
 //泛型？
 public class LerpStorage {
     private float number;
@@ -33,5 +35,25 @@ public class LerpStorage {
 
     public float getoNumber() {
         return oNumber;
+    }
+
+    @Override
+    public String toString() {
+        return "LerpStorage{" +
+                "number=" + number +
+                ", oNumber=" + oNumber +
+                '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) return false;
+        LerpStorage that = (LerpStorage) o;
+        return Float.compare(number, that.number) == 0 && Float.compare(oNumber, that.oNumber) == 0;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(number, oNumber);
     }
 }
