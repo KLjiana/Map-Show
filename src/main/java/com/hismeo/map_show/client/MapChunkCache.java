@@ -45,11 +45,14 @@ public class MapChunkCache {
         }
     }
 
-    public void setChunk(ChunkAccess chunkAccess, boolean copy) {
+    public @Nullable MapChunk setChunk(ChunkAccess chunkAccess, boolean copy) {
         ChunkPos pos = chunkAccess.getPos();
         if (storage.inRange(pos.x, pos.z)) {
-            storage.replace(storage.getIndex(pos.x, pos.z), MapChunk.fromVanilla(level, chunkAccess, copy));
+            MapChunk chunk = MapChunk.fromVanilla(level, chunkAccess, copy);
+            storage.replace(storage.getIndex(pos.x, pos.z), chunk);
+            return chunk;
         }
+        return null;
     }
 
     public @Nullable MapChunk getChunk(int x, int z) {
@@ -62,7 +65,7 @@ public class MapChunkCache {
         return null;
     }
 
-    private static boolean isValidChunk(@Nullable MapChunk chunk, int x, int z) {
+    static boolean isValidChunk(@Nullable MapChunk chunk, int x, int z) {
         if (chunk == null) {
             return false;
         } else {
@@ -87,7 +90,7 @@ public class MapChunkCache {
         return storage.chunkRadius;
     }
 
-    static final class Storage {
+    final class Storage {
         final AtomicReferenceArray<MapChunk> chunks;
         final int chunkRadius;
         private final int viewRange;
@@ -109,12 +112,21 @@ public class MapChunkCache {
             MapChunk mapChunk = chunks.getAndSet(chunkIndex, chunk);
             if (mapChunk != null) {
                 this.chunkCount--;
-                //MapChunkCache.this.level.unload(mapChunk);
+                MapChunkCache.this.level.unload(mapChunk);
             }
 
             if (chunk != null) {
                 this.chunkCount++;
             }
+        }
+
+        MapChunk replace(int chunkIndex, MapChunk chunk, @Nullable MapChunk replaceWith) {
+            if (this.chunks.compareAndSet(chunkIndex, chunk, replaceWith) && replaceWith == null) {
+                this.chunkCount--;
+            }
+
+            MapChunkCache.this.level.unload(chunk);
+            return chunk;
         }
 
         boolean inRange(int x, int z) {

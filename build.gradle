@@ -14,6 +14,17 @@ group = mod_group_id
 
 repositories {
     mavenLocal()
+
+    exclusiveContent {
+        forRepository {
+            maven {
+                url "https://cursemaven.com"
+            }
+        }
+        filter {
+            includeGroup "curse.maven"
+        }
+    }
 }
 
 base {
@@ -83,6 +94,7 @@ configurations {
 }
 
 dependencies {
+    implementation "curse.maven:xaeros-world-map-317780:6778114"
 }
 
 tasks.withType(ProcessResources).configureEach {

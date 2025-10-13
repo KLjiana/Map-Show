@@ -1,10 +1,10 @@
 package com.hismeo.map_show.client;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.DimensionSpecialEffects;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ChunkResult;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.ColorResolver;
 import net.minecraft.world.level.Level;
@@ -16,6 +16,10 @@ import net.minecraft.world.level.lighting.LevelLightEngine;
 import net.minecraft.world.level.material.FluidState;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+
 /**
  * @see net.minecraft.client.multiplayer.ClientLevel
  */
@@ -25,6 +29,8 @@ public class MapLevel implements BlockAndTintGetter {
     protected final DimensionSpecialEffects effects;
     private final int height;
     private final int minBuildHeight;
+
+    private final List<CompletableFuture<ChunkResult<MapChunk>>> scheduledDropChunks = new ArrayList<>();
 
     public MapLevel(ResourceKey<Level> dimension, DimensionSpecialEffects effects, int viewDistance, int height, int minBuildHeight) {
         this.dimension = dimension;
@@ -99,5 +105,14 @@ public class MapLevel implements BlockAndTintGetter {
 
     public MapChunkCache getChunkSource() {
         return chunkSource;
+    }
+
+    public void unload(MapChunk chunk) {
+        chunk.scheduledForDrop = true;
+
+    }
+
+    public void onChunkLoaded(MapChunk chunk) {
+        chunk.scheduledForDrop = false;
     }
 }

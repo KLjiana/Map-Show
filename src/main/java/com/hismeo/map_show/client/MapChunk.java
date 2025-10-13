@@ -22,6 +22,7 @@ public class MapChunk implements BlockGetter {
     protected final MapLevel level;
     protected final ChunkPos pos;
     protected final MapChunkSection[] sections;
+    protected boolean scheduledForDrop;
 
     public MapChunk(MapLevel level, ChunkPos pos, MapChunkSection[] sections) {
         this.level = level;

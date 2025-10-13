@@ -4,20 +4,31 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.PalettedContainer;
 import net.minecraft.world.level.chunk.storage.ChunkSerializer;
+import net.minecraft.world.level.chunk.storage.IOWorker;
+import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
 
+import java.nio.file.Path;
 import java.util.Objects;
 
 /**
  * @see net.minecraft.world.level.chunk.storage.ChunkSerializer
  */
 public class MapSerializer {
-    public static MapChunk read(MapLevel level, ChunkPos pos, CompoundTag chunkTag) {
+    private IOWorker worker;
+
+    public MapSerializer(String levelName, ResourceKey<Level> dimension, Path folder) {
+        this.worker = new IOWorker(new RegionStorageInfo(levelName, dimension, "map"), folder, false); // 即不使用DSYNC
+    }
+
+    private static MapChunk read(MapLevel level, ChunkPos pos, CompoundTag chunkTag) {
         ChunkPos chunkpos = new ChunkPos(chunkTag.getInt("xPos"), chunkTag.getInt("zPos"));
         if (!Objects.equals(pos, chunkpos)) {
             throw new IllegalArgumentException();
@@ -44,7 +55,7 @@ public class MapSerializer {
         return new MapChunk(level, pos, sections);
     }
 
-    public static CompoundTag write(MapChunk chunk) {
+    private static CompoundTag write(MapChunk chunk) {
         ChunkPos chunkpos = chunk.getPos();
         CompoundTag chunkTag = new CompoundTag();
         chunkTag.putInt("xPos", chunkpos.x);
