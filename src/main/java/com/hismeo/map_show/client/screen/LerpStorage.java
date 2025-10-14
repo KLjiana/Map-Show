@@ -6,6 +6,7 @@ import java.util.Objects;
 
 //泛型？
 public class LerpStorage {
+    private float lastDelta = 0;
     private float number;
     private float oNumber;
 
@@ -20,6 +21,8 @@ public class LerpStorage {
     }
 
     public float lerp(float delta) {
+        if (lastDelta > delta) return number;
+        lastDelta = delta;
         return Mth.lerp(delta, oNumber, number);
     }
 
