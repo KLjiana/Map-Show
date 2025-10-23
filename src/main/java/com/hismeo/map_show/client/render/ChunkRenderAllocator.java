@@ -25,14 +25,15 @@ import java.util.Map;
 
 public class ChunkRenderAllocator {
     //TODO
-    private ObjectArrayList renderingChunk = new ObjectArrayList<>();
-    private boolean rendering = false;
-    private BlockRenderAllocator blockRenderAllocator;
-    private MapLevel mapLevel;
+    private final ObjectArrayList renderingChunk = new ObjectArrayList<>();
+    private final boolean rendering = false;
+    private final BlockRenderAllocator blockRenderAllocator;
+    private final MapLevel mapLevel;
     private BlockRenderDispatcher blockRenderer;
 
     public ChunkRenderAllocator(MapLevel mapLevel) {
         this.mapLevel = mapLevel;
+        this.blockRenderAllocator = new BlockRenderAllocator();
     }
 
     public void setBlockRenderer(BlockRenderDispatcher blockRenderer) {
@@ -44,7 +45,7 @@ public class ChunkRenderAllocator {
     }
 
     //TODO CACHE
-    protected void renderCurrentChunk(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource) {
+    public void renderCurrentChunk(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource) {
         MapChunkCache source = mapLevel.getChunkSource();
         int viewCenterX = source.viewCenterX();
         int viewCenterZ = source.viewCenterZ();
@@ -75,7 +76,6 @@ public class ChunkRenderAllocator {
         ModelBlockRenderer.clearCache();
     }
 
-    //FIXME y轴重叠问题
     protected void renderSingleChunk(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource, MapChunk chunk, RandomSource randomSource) {
         if (chunk != null) {
             BlockPos minPos = chunk.getPos().getWorldPosition().above(mapLevel.getMinBuildHeight());
@@ -99,8 +99,7 @@ public class ChunkRenderAllocator {
                     RenderType liquidRendertype = ItemBlockRenderTypes.getRenderLayer(fluidstate);
 //                    BufferBuilder bufferbuilder = this.getOrBeginLayer(map, sectionBufferBuilderPack, liquidRendertype);
                     VertexConsumer consumer = bufferSource.getBuffer(liquidRendertype);
-                    blockRenderer.renderLiquid(blockpos2, mapLevel, consumer, blockstate, fluidstate);
-                    bufferSource.endBatch();
+                    blockRenderAllocator.renderLiquid(poseStack, mapLevel, blockpos2, consumer, blockstate, fluidstate);
                 }
 
                 if (blockstate.getRenderShape() == RenderShape.MODEL) {
