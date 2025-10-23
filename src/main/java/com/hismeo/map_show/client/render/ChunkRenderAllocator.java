@@ -1,4 +1,4 @@
-package com.hismeo.map_show.client.screen;
+package com.hismeo.map_show.client.render;
 
 import com.hismeo.map_show.client.MapChunk;
 import com.hismeo.map_show.client.MapChunkCache;
@@ -100,6 +100,7 @@ public class ChunkRenderAllocator {
 //                    BufferBuilder bufferbuilder = this.getOrBeginLayer(map, sectionBufferBuilderPack, liquidRendertype);
                     VertexConsumer consumer = bufferSource.getBuffer(liquidRendertype);
                     blockRenderer.renderLiquid(blockpos2, mapLevel, consumer, blockstate, fluidstate);
+                    bufferSource.endBatch();
                 }
 
                 if (blockstate.getRenderShape() == RenderShape.MODEL) {

@@ -1,10 +1,8 @@
 package com.hismeo.map_show.client.screen;
 
 import com.hismeo.map_show.client.ClientMap;
-import com.hismeo.map_show.client.MapChunk;
-import com.hismeo.map_show.client.MapChunkCache;
 import com.hismeo.map_show.client.MapLevel;
-import com.mojang.blaze3d.systems.RenderSystem;
+import com.hismeo.map_show.client.render.ChunkRenderAllocator;
 import com.mojang.blaze3d.vertex.*;
 import com.mojang.math.Axis;
 import net.minecraft.client.DeltaTracker;
@@ -12,26 +10,12 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.*;
-import net.minecraft.client.renderer.block.BlockRenderDispatcher;
-import net.minecraft.client.renderer.block.ModelBlockRenderer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.client.renderer.texture.TextureAtlas;
-import net.minecraft.client.resources.model.BakedModel;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.SectionPos;
 import net.minecraft.network.chat.CommonComponents;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.RenderShape;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.material.FluidState;
 import net.neoforged.fml.loading.FMLLoader;
 import net.neoforged.neoforge.client.model.data.ModelData;
 import org.jetbrains.annotations.NotNull;
-import org.joml.Vector3f;
-
-import java.util.Map;
 
 /**
  * @see ClientMap#getCurrentLevel(ClientLevel) 获取MapLevel
