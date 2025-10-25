@@ -3,8 +3,10 @@ package com.hismeo.map_show.client.render;
 import com.hismeo.map_show.client.MapChunk;
 import com.hismeo.map_show.client.MapChunkCache;
 import com.hismeo.map_show.client.MapLevel;
+import com.hismeo.map_show.client.render.block.BlockRenderAllocator;
 import com.mojang.blaze3d.vertex.*;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
@@ -22,26 +24,24 @@ import net.minecraft.world.level.material.FluidState;
 import net.neoforged.neoforge.client.model.data.ModelData;
 
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public class ChunkRenderAllocator {
-    //TODO
-    private final ObjectArrayList renderingChunk = new ObjectArrayList<>();
+    private final Map<RenderType, VertexBuffer> buffers = RenderType.chunkBufferLayers()
+            .stream()
+            .collect(Collectors.toMap(renderType -> renderType, renderType -> new VertexBuffer(VertexBuffer.Usage.STATIC)));
+    private final ObjectArrayList<RenderedChunk> renderingChunk = new ObjectArrayList<>();
     private final boolean rendering = false;
     private final BlockRenderAllocator blockRenderAllocator;
     private final MapLevel mapLevel;
-    private BlockRenderDispatcher blockRenderer;
 
-    public ChunkRenderAllocator(MapLevel mapLevel) {
+    public ChunkRenderAllocator(MapLevel mapLevel, BlockColors blockColors) {
         this.mapLevel = mapLevel;
-        this.blockRenderAllocator = new BlockRenderAllocator();
+        this.blockRenderAllocator = new BlockRenderAllocator(blockColors);
     }
 
-    public void setBlockRenderer(BlockRenderDispatcher blockRenderer) {
-        this.blockRenderer = blockRenderer;
-    }
-
-    public void renderSingleBlock(BlockState state, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight, int packedOverlay, ModelData modelData, RenderType renderType) {
-        blockRenderer.renderSingleBlock(state, poseStack, bufferSource, packedLight, packedOverlay, modelData, renderType);
+    public void renderCurrentChunk(PoseStack poseStack) {
+        renderCurrentChunk(poseStack, );
     }
 
     //TODO CACHE
@@ -52,22 +52,26 @@ public class ChunkRenderAllocator {
         int radius = source.chunkRadius();
         RandomSource randomsource = RandomSource.create();
         ModelBlockRenderer.enableCaching();
-        renderSingleChunk(poseStack, bufferSource, source.getChunk(viewCenterX, viewCenterZ), randomsource);
 
-        //TODO CACHE!!!!
-//        for (int dx = -radius; dx <= radius; dx++) {
-//            for (int dz = -radius; dz <= radius; dz++) {
-//                int chunkX = viewCenterX + dx;
-//                int chunkZ = viewCenterZ + dz;
-//                MapChunk chunk = source.getChunk(chunkX, chunkZ);
-//                if (chunk == null) continue;
-//
-//                poseStack.pushPose();
-//                poseStack.translate(dx * 16, 0, dz * 16);
-//                renderSingleChunk(poseStack, bufferSource, chunk, randomsource);
-//                poseStack.popPose();
-//            }
-//        }
+        //DEBUG
+        if (true) {
+            renderSingleChunk(poseStack, bufferSource, source.getChunk(viewCenterX, viewCenterZ), randomsource);
+        } else {
+            //TODO CACHE!!!!
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    int chunkX = viewCenterX + dx;
+                    int chunkZ = viewCenterZ + dz;
+                    MapChunk chunk = source.getChunk(chunkX, chunkZ);
+                    if (chunk == null) continue;
+
+                    poseStack.pushPose();
+                    poseStack.translate(dx * 16, 0, dz * 16);
+                    renderSingleChunk(poseStack, bufferSource, chunk, randomsource);
+                    poseStack.popPose();
+                }
+            }
+        }
         bufferSource.endLastBatch();
         bufferSource.endBatch(RenderType.entitySolid(TextureAtlas.LOCATION_BLOCKS));
         bufferSource.endBatch(RenderType.entityCutout(TextureAtlas.LOCATION_BLOCKS));
@@ -99,7 +103,7 @@ public class ChunkRenderAllocator {
                     RenderType liquidRendertype = ItemBlockRenderTypes.getRenderLayer(fluidstate);
 //                    BufferBuilder bufferbuilder = this.getOrBeginLayer(map, sectionBufferBuilderPack, liquidRendertype);
                     VertexConsumer consumer = bufferSource.getBuffer(liquidRendertype);
-                    blockRenderAllocator.renderLiquid(poseStack, mapLevel, blockpos2, consumer, blockstate, fluidstate);
+//                    blockRenderAllocator.renderLiquid(poseStack, mapLevel, blockpos2, consumer, blockstate, fluidstate);
                 }
 
                 if (blockstate.getRenderShape() == RenderShape.MODEL) {
@@ -108,12 +112,14 @@ public class ChunkRenderAllocator {
                     modelData = model.getModelData(mapLevel, blockpos2, blockstate, modelData);
                     randomSource.setSeed(blockstate.getSeed(blockpos2));
 
+                    //TODO vertexsort
                     for (RenderType blockRendertype : model.getRenderTypes(blockstate, randomSource, modelData)) {
 //                        BufferBuilder bufferbuilder1 = this.getOrBeginLayer(map, sectionBufferBuilderPack, blockRendertype);
                         poseStack.pushPose();
                         poseStack.translate((float) SectionPos.sectionRelative(blockpos2.getX()), blockpos2.getY(), (float) SectionPos.sectionRelative(blockpos2.getZ()));
                         VertexConsumer consumer = bufferSource.getBuffer(blockRendertype);
-                        blockRenderer.renderBatched(blockstate, blockpos2, mapLevel, poseStack, consumer, true, randomSource, modelData, blockRendertype);
+                        blockRenderAllocator.renderBlock();
+//                        blockRenderer.renderBatched(blockstate, blockpos2, mapLevel, poseStack, consumer, true, randomSource, modelData, blockRendertype);
                         poseStack.popPose();
                     }
                 }

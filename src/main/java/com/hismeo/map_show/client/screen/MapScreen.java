@@ -39,13 +39,12 @@ public class MapScreen extends Screen {
     public MapScreen(@NotNull MapLevel mapLevel) {
         //TODO title补齐
         super(CommonComponents.EMPTY);
-        this.chunkRenderAllocator = new ChunkRenderAllocator(mapLevel);
+        this.chunkRenderAllocator = new ChunkRenderAllocator(mapLevel, minecraft.getBlockColors());
     }
 
     @Override
     protected void init() {
         super.init();
-        this.chunkRenderAllocator.setBlockRenderer(minecraft.getBlockRenderer());
     }
 
     @Override
@@ -60,22 +59,14 @@ public class MapScreen extends Screen {
         poseStack.pushPose();
 
         poseStack.translate(width / 2f + xTran.lerp(deltaTicks), height / 2f + yTran.lerp(deltaTicks), 0);
-
         float s = scale.lerp(deltaTicks);
         poseStack.scale(s, -s, s);
         poseStack.mulPose(Axis.XP.rotationDegrees(yRot.lerp(deltaTicks)));
         poseStack.mulPose(Axis.YP.rotationDegrees(xRot.lerp(deltaTicks)));
 
-//        renderDebugSingleBlock(poseStack, bufferSource);
         chunkRenderAllocator.renderCurrentChunk(poseStack, bufferSource);
 
         poseStack.popPose();
-    }
-
-    protected void renderDebugSingleBlock(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource) {
-        chunkRenderAllocator.renderSingleBlock(Blocks.GRASS_BLOCK.defaultBlockState(), poseStack, bufferSource, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY, ModelData.EMPTY, null);
-        bufferSource.endBatch();
-//        testQuad(bufferSource, poseStack);
     }
 
     protected void renderDebugMessage(GuiGraphics guiGraphics, float partialTick) {
