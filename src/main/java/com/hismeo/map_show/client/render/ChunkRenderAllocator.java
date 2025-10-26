@@ -4,30 +4,23 @@ import com.hismeo.map_show.client.MapChunk;
 import com.hismeo.map_show.client.MapChunkCache;
 import com.hismeo.map_show.client.MapLevel;
 import com.hismeo.map_show.client.render.block.BlockRenderAllocator;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectArrayMap;
 import net.minecraft.client.color.block.BlockColors;
-import net.minecraft.client.renderer.ItemBlockRenderTypes;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.SectionBufferBuilderPack;
-import net.minecraft.client.renderer.block.BlockRenderDispatcher;
+import net.minecraft.client.renderer.block.BlockModelShaper;
 import net.minecraft.client.renderer.block.ModelBlockRenderer;
-import net.minecraft.client.renderer.texture.TextureAtlas;
-import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.SectionPos;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.material.FluidState;
-import net.neoforged.neoforge.client.model.data.ModelData;
 
 import java.util.Map;
 import java.util.stream.Collectors;
 
 public class ChunkRenderAllocator {
-    private final Map<RenderType, VertexBuffer> buffers = RenderType.chunkBufferLayers()
+    private final Map<RenderType, VertexBuffer> vboMap = RenderType.chunkBufferLayers()
             .stream()
             .collect(Collectors.toMap(renderType -> renderType, renderType -> new VertexBuffer(VertexBuffer.Usage.STATIC)));
     private final ObjectArrayList<RenderedChunk> renderingChunk = new ObjectArrayList<>();
@@ -35,27 +28,22 @@ public class ChunkRenderAllocator {
     private final BlockRenderAllocator blockRenderAllocator;
     private final MapLevel mapLevel;
 
-    public ChunkRenderAllocator(MapLevel mapLevel, BlockColors blockColors) {
+    public ChunkRenderAllocator(MapLevel mapLevel, BlockColors blockColors, BlockModelShaper blockModelShaper) {
         this.mapLevel = mapLevel;
-        this.blockRenderAllocator = new BlockRenderAllocator(blockColors);
-    }
-
-    public void renderCurrentChunk(PoseStack poseStack) {
-        renderCurrentChunk(poseStack, );
+        this.blockRenderAllocator = new BlockRenderAllocator(blockColors, blockModelShaper);
     }
 
     //TODO CACHE
-    public void renderCurrentChunk(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource) {
+    public void renderCurrentChunk(PoseStack poseStack) {
         MapChunkCache source = mapLevel.getChunkSource();
         int viewCenterX = source.viewCenterX();
         int viewCenterZ = source.viewCenterZ();
         int radius = source.chunkRadius();
-        RandomSource randomsource = RandomSource.create();
         ModelBlockRenderer.enableCaching();
 
-        //DEBUG
         if (true) {
-            renderSingleChunk(poseStack, bufferSource, source.getChunk(viewCenterX, viewCenterZ), randomsource);
+            //DEBUG
+            renderSingleChunk(poseStack, source.getChunk(viewCenterX, viewCenterZ));
         } else {
             //TODO CACHE!!!!
             for (int dx = -radius; dx <= radius; dx++) {
@@ -67,75 +55,42 @@ public class ChunkRenderAllocator {
 
                     poseStack.pushPose();
                     poseStack.translate(dx * 16, 0, dz * 16);
-                    renderSingleChunk(poseStack, bufferSource, chunk, randomsource);
+                    renderSingleChunk(poseStack, chunk);
                     poseStack.popPose();
                 }
             }
         }
-        bufferSource.endLastBatch();
-        bufferSource.endBatch(RenderType.entitySolid(TextureAtlas.LOCATION_BLOCKS));
-        bufferSource.endBatch(RenderType.entityCutout(TextureAtlas.LOCATION_BLOCKS));
-        bufferSource.endBatch(RenderType.entityCutoutNoCull(TextureAtlas.LOCATION_BLOCKS));
-        bufferSource.endBatch(RenderType.entitySmoothCutout(TextureAtlas.LOCATION_BLOCKS));
         ModelBlockRenderer.clearCache();
     }
 
-    protected void renderSingleChunk(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource, MapChunk chunk, RandomSource randomSource) {
+    protected void renderSingleChunk(PoseStack poseStack, MapChunk chunk) {
         if (chunk != null) {
             BlockPos minPos = chunk.getPos().getWorldPosition().above(mapLevel.getMinBuildHeight());
             BlockPos maxPos = minPos.offset(15, mapLevel.getMaxBuildHeight(), 15);
-            for (BlockPos blockpos2 : BlockPos.betweenClosed(minPos, maxPos)) {
-                BlockState blockstate = mapLevel.getBlockState(blockpos2);
-//                if (blockstate.is(Blocks.AIR)) return;
-//                if (blockstate.isSolidRender(mapLevel, blockpos2)) {
-//                    visgraph.setOpaque(blockpos2);
-//                }
+            Map<RenderType, BufferBuilder> map = new Reference2ObjectArrayMap<>(RenderType.chunkBufferLayers().size());
+            for (BlockPos blockPos : BlockPos.betweenClosed(minPos, maxPos)) {
+                BlockState blockstate = mapLevel.getBlockState(blockPos);
+                blockRenderAllocator.renderBlockLayer(map, mapLevel, blockstate, blockPos, poseStack);
+            }
 
-//                if (blockstate.hasBlockEntity()) {
-//                    BlockEntity blockentity = mapLevel.getBlockEntity(blockpos2);
-//                    if (blockentity != null) {
-//                        this.handleBlockEntity(sectioncompiler$results, blockentity);
-//                    }
-//                }
-
-                FluidState fluidstate = blockstate.getFluidState();
-                if (!fluidstate.isEmpty()) {
-                    RenderType liquidRendertype = ItemBlockRenderTypes.getRenderLayer(fluidstate);
-//                    BufferBuilder bufferbuilder = this.getOrBeginLayer(map, sectionBufferBuilderPack, liquidRendertype);
-                    VertexConsumer consumer = bufferSource.getBuffer(liquidRendertype);
-//                    blockRenderAllocator.renderLiquid(poseStack, mapLevel, blockpos2, consumer, blockstate, fluidstate);
-                }
-
-                if (blockstate.getRenderShape() == RenderShape.MODEL) {
-                    BakedModel model = blockRenderer.getBlockModel(blockstate);
-                    ModelData modelData = mapLevel.getModelData(blockpos2);
-                    modelData = model.getModelData(mapLevel, blockpos2, blockstate, modelData);
-                    randomSource.setSeed(blockstate.getSeed(blockpos2));
-
-                    //TODO vertexsort
-                    for (RenderType blockRendertype : model.getRenderTypes(blockstate, randomSource, modelData)) {
-//                        BufferBuilder bufferbuilder1 = this.getOrBeginLayer(map, sectionBufferBuilderPack, blockRendertype);
-                        poseStack.pushPose();
-                        poseStack.translate((float) SectionPos.sectionRelative(blockpos2.getX()), blockpos2.getY(), (float) SectionPos.sectionRelative(blockpos2.getZ()));
-                        VertexConsumer consumer = bufferSource.getBuffer(blockRendertype);
-                        blockRenderAllocator.renderBlock();
-//                        blockRenderer.renderBatched(blockstate, blockpos2, mapLevel, poseStack, consumer, true, randomSource, modelData, blockRendertype);
-                        poseStack.popPose();
-                    }
+            Map<RenderType, MeshData> meshes = new Reference2ObjectArrayMap<>();
+            for (var entry : map.entrySet()) {
+                MeshData meshData = entry.getValue().build();
+                if (meshData != null) {
+                    meshes.put(entry.getKey(), meshData);
                 }
             }
+            meshes.forEach((renderType, meshData) -> {
+                VertexBuffer vertexBuffer = vboMap.get(renderType);
+                if (vertexBuffer.isInvalid()) {
+                    meshData.close();
+                } else {
+                                        vertexBuffer.bind();
+                    vertexBuffer.upload(meshData);
+                    vertexBuffer.drawWithShader(RenderSystem.getModelViewMatrix(), RenderSystem.getProjectionMatrix(), RenderSystem.getShader());
+                    VertexBuffer.unbind();
+                }
+            });
         }
-    }
-
-    //Should we need?
-    private BufferBuilder getOrBeginLayer(Map<RenderType, BufferBuilder> bufferLayers, SectionBufferBuilderPack sectionBufferBuilderPack, RenderType renderType) {
-        BufferBuilder bufferbuilder = bufferLayers.get(renderType);
-        if (bufferbuilder == null) {
-            ByteBufferBuilder bytebufferbuilder = sectionBufferBuilderPack.buffer(renderType);
-            bufferbuilder = new BufferBuilder(bytebufferbuilder, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
-            bufferLayers.put(renderType, bufferbuilder);
-        }
-
-        return bufferbuilder;
     }
 }

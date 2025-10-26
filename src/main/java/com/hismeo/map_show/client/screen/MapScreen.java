@@ -34,28 +34,28 @@ public class MapScreen extends Screen {
     private final LerpStorage scale = new LerpStorage(20.0f);
     private double lastMouseX;
     private double lastMouseY;
+    private final MapLevel mapLevel;
     private ChunkRenderAllocator chunkRenderAllocator;
 
     public MapScreen(@NotNull MapLevel mapLevel) {
         //TODO title补齐
         super(CommonComponents.EMPTY);
-        this.chunkRenderAllocator = new ChunkRenderAllocator(mapLevel, minecraft.getBlockColors());
+        this.mapLevel = mapLevel;
     }
 
     @Override
     protected void init() {
         super.init();
+        this.chunkRenderAllocator = new ChunkRenderAllocator(mapLevel, minecraft.getBlockColors(), minecraft.getModelManager().getBlockModelShaper());
     }
 
     @Override
     public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         super.render(guiGraphics, mouseX, mouseY, partialTick);
         float deltaTicks = minecraft.getTimer() instanceof DeltaTracker.Timer timer ? timer.deltaTickResidual : partialTick;
-
         renderDebugMessage(guiGraphics, deltaTicks);
-        PoseStack poseStack = guiGraphics.pose();
-        MultiBufferSource.BufferSource bufferSource = guiGraphics.bufferSource();
 
+        PoseStack poseStack = guiGraphics.pose();
         poseStack.pushPose();
 
         poseStack.translate(width / 2f + xTran.lerp(deltaTicks), height / 2f + yTran.lerp(deltaTicks), 0);
@@ -64,7 +64,7 @@ public class MapScreen extends Screen {
         poseStack.mulPose(Axis.XP.rotationDegrees(yRot.lerp(deltaTicks)));
         poseStack.mulPose(Axis.YP.rotationDegrees(xRot.lerp(deltaTicks)));
 
-        chunkRenderAllocator.renderCurrentChunk(poseStack, bufferSource);
+        chunkRenderAllocator.renderCurrentChunk(poseStack);
 
         poseStack.popPose();
     }
