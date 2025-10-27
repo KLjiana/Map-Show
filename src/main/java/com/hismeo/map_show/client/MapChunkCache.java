@@ -90,6 +90,10 @@ public class MapChunkCache {
         return storage.chunkRadius;
     }
 
+    public int getChunkCount() {
+        return storage.chunkCount;
+    }
+
     final class Storage {
         final AtomicReferenceArray<MapChunk> chunks;
         final int chunkRadius;

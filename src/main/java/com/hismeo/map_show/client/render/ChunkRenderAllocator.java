@@ -1,36 +1,38 @@
 package com.hismeo.map_show.client.render;
 
+import com.google.common.collect.ImmutableMap;
 import com.hismeo.map_show.client.MapChunk;
 import com.hismeo.map_show.client.MapChunkCache;
 import com.hismeo.map_show.client.MapLevel;
 import com.hismeo.map_show.client.render.block.BlockRenderAllocator;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.Object2ObjectFunction;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectArrayMap;
 import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.block.BlockModelShaper;
 import net.minecraft.client.renderer.block.ModelBlockRenderer;
 import net.minecraft.core.BlockPos;
-import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.Map;
 import java.util.stream.Collectors;
 
 public class ChunkRenderAllocator {
-    private final Map<RenderType, VertexBuffer> vboMap = RenderType.chunkBufferLayers()
-            .stream()
-            .collect(Collectors.toMap(renderType -> renderType, renderType -> new VertexBuffer(VertexBuffer.Usage.STATIC)));
-    private final ObjectArrayList<RenderedChunk> renderingChunk = new ObjectArrayList<>();
-    private final boolean rendering = false;
     private final BlockRenderAllocator blockRenderAllocator;
     private final MapLevel mapLevel;
+    private final Object2ObjectOpenHashMap<ChunkPos, RenderedChunk> renderingChunk = new Object2ObjectOpenHashMap<>();
 
     public ChunkRenderAllocator(MapLevel mapLevel, BlockColors blockColors, BlockModelShaper blockModelShaper) {
         this.mapLevel = mapLevel;
         this.blockRenderAllocator = new BlockRenderAllocator(blockColors, blockModelShaper);
+    }
+
+    public boolean isRendering(ChunkPos chunkPos) {
+        return renderingChunk.containsKey(chunkPos);
     }
 
     //TODO CACHE
@@ -64,33 +66,63 @@ public class ChunkRenderAllocator {
     }
 
     protected void renderSingleChunk(PoseStack poseStack, MapChunk chunk) {
+        renderingChunk.computeIfAbsent(chunk.getPos(), pos -> {
+            RenderedChunk renderedChunk = new RenderedChunk((ChunkPos) pos);
+            var meshDataMap = buildChunkBuffer(poseStack, chunk);
+            uploadChunkVBO(meshDataMap, renderedChunk.renderLayer());
+            return renderedChunk;
+        });
+
+        for (RenderedChunk renderedChunk : renderingChunk.values()) {
+            renderChunkVBO(renderedChunk.renderLayer());
+        }
+    }
+
+    protected Map<RenderType, MeshData> buildChunkBuffer(PoseStack poseStack, MapChunk chunk) {
         if (chunk != null) {
-            BlockPos minPos = chunk.getPos().getWorldPosition().above(mapLevel.getMinBuildHeight());
-            BlockPos maxPos = minPos.offset(15, mapLevel.getMaxBuildHeight(), 15);
-            Map<RenderType, BufferBuilder> map = new Reference2ObjectArrayMap<>(RenderType.chunkBufferLayers().size());
+            BlockPos minPos = chunk.getPos().getWorldPosition().atY(mapLevel.getMinBuildHeight());
+            BlockPos maxPos = minPos.offset(15, mapLevel.getHeight() - 1, 15);
+
+            var map = new Reference2ObjectArrayMap<RenderType, BufferBuilder>(RenderType.chunkBufferLayers().size());
             for (BlockPos blockPos : BlockPos.betweenClosed(minPos, maxPos)) {
                 BlockState blockstate = mapLevel.getBlockState(blockPos);
                 blockRenderAllocator.renderBlockLayer(map, mapLevel, blockstate, blockPos, poseStack);
             }
 
-            Map<RenderType, MeshData> meshes = new Reference2ObjectArrayMap<>();
-            for (var entry : map.entrySet()) {
-                MeshData meshData = entry.getValue().build();
+            var meshes = new Reference2ObjectArrayMap<RenderType, MeshData>();
+            map.forEach((renderType, bufferBuilder) -> {
+                MeshData meshData = bufferBuilder.build();
                 if (meshData != null) {
-                    meshes.put(entry.getKey(), meshData);
-                }
-            }
-            meshes.forEach((renderType, meshData) -> {
-                VertexBuffer vertexBuffer = vboMap.get(renderType);
-                if (vertexBuffer.isInvalid()) {
-                    meshData.close();
-                } else {
-                                        vertexBuffer.bind();
-                    vertexBuffer.upload(meshData);
-                    vertexBuffer.drawWithShader(RenderSystem.getModelViewMatrix(), RenderSystem.getProjectionMatrix(), RenderSystem.getShader());
-                    VertexBuffer.unbind();
+                    meshes.put(renderType, meshData);
                 }
             });
+            return meshes;
         }
+        return ImmutableMap.of();
+    }
+
+    protected void uploadChunkVBO(Map<RenderType, MeshData> meshes, Map<RenderType, VertexBuffer> renderLayer) {
+        meshes.forEach((renderType, meshData) -> {
+            VertexBuffer vertexBuffer = renderLayer.get(renderType);
+            if (vertexBuffer.isInvalid()) {
+                meshData.close();
+            } else {
+                vertexBuffer.bind();
+                vertexBuffer.upload(meshData);
+                vertexBuffer.drawWithShader(RenderSystem.getModelViewMatrix(), RenderSystem.getProjectionMatrix(), RenderSystem.getShader());
+                VertexBuffer.unbind();
+            }
+        });
+    }
+
+    protected void renderChunkVBO(Map<RenderType, VertexBuffer> renderLayer) {
+        renderLayer.forEach((renderType, vertexBuffer) -> {
+            if (vertexBuffer.isInvalid() || vertexBuffer.mode == null || vertexBuffer.getIndexType() == null) return;
+            renderType.setupRenderState();
+            vertexBuffer.bind();
+            vertexBuffer.drawWithShader(RenderSystem.getModelViewMatrix(), RenderSystem.getProjectionMatrix(), RenderSystem.getShader());
+            VertexBuffer.unbind();
+            renderType.clearRenderState();
+        });
     }
 }

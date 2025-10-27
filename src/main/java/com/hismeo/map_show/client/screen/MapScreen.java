@@ -58,7 +58,7 @@ public class MapScreen extends Screen {
         PoseStack poseStack = guiGraphics.pose();
         poseStack.pushPose();
 
-        poseStack.translate(width / 2f + xTran.lerp(deltaTicks), height / 2f + yTran.lerp(deltaTicks), 0);
+        poseStack.translate(width / 2f + xTran.lerp(deltaTicks), height / 2f + yTran.lerp(deltaTicks), -10);
         float s = scale.lerp(deltaTicks);
         poseStack.scale(s, -s, s);
         poseStack.mulPose(Axis.XP.rotationDegrees(yRot.lerp(deltaTicks)));
@@ -71,13 +71,15 @@ public class MapScreen extends Screen {
 
     protected void renderDebugMessage(GuiGraphics guiGraphics, float partialTick) {
         if (FMLLoader.isProduction()) return;
-        guiGraphics.drawString(font, "xTran: %s, %s".formatted(xTran.getNumber(), xTran.getoNumber()), 0, 0, 0xFFFFFF, false);
-        guiGraphics.drawString(font, "yTran: %s, %s".formatted(yTran.getNumber(), yTran.getoNumber()), 0, 10, 0xFFFFFF, false);
-        guiGraphics.drawString(font, "xRot: %s, %s".formatted(xRot.getNumber(), xRot.getoNumber()), 0, 20, 0xFFFFFF, false);
-        guiGraphics.drawString(font, "yRot: %s, %s".formatted(yRot.getNumber(), yRot.getoNumber()), 0, 30, 0xFFFFFF, false);
-        guiGraphics.drawString(font, "scale: %s, %s".formatted(scale.getNumber(), scale.getoNumber()), 0, 40, 0xFFFFFF, false);
+        guiGraphics.drawString(font, "chunkCount: %s".formatted(mapLevel.getChunkSource().getChunkCount()), 0, 0, 0xFFFFFF, false);
 
-        guiGraphics.drawString(font, "partialTick: %s".formatted(partialTick), 0, 55, 0xFFFFFF, false);
+        guiGraphics.drawString(font, "xTran: %s, %s".formatted(xTran.getNumber(), xTran.getoNumber()), 0, 10, 0xFFFFFF, false);
+        guiGraphics.drawString(font, "yTran: %s, %s".formatted(yTran.getNumber(), yTran.getoNumber()), 0, 20, 0xFFFFFF, false);
+        guiGraphics.drawString(font, "xRot: %s, %s".formatted(xRot.getNumber(), xRot.getoNumber()), 0, 30, 0xFFFFFF, false);
+        guiGraphics.drawString(font, "yRot: %s, %s".formatted(yRot.getNumber(), yRot.getoNumber()), 0, 40, 0xFFFFFF, false);
+        guiGraphics.drawString(font, "scale: %s, %s".formatted(scale.getNumber(), scale.getoNumber()), 0, 50, 0xFFFFFF, false);
+
+        guiGraphics.drawString(font, "partialTick: %s".formatted(partialTick), 0, 65, 0xFFFFFF, false);
     }
 
 
