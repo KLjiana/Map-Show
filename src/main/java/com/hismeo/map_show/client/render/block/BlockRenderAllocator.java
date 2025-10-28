@@ -29,11 +29,7 @@ import java.util.Map;
 //TODO 分包 解耦 合并逻辑
 public class BlockRenderAllocator {
     private static final List<RenderType> RENDER_TYPES = RenderType.chunkBufferLayers();
-    private final Map<RenderType, ByteBufferBuilder> buffers = Util.make(new Reference2ObjectArrayMap<>(RENDER_TYPES.size()), map -> {
-        for (RenderType rendertype : RENDER_TYPES) {
-            map.put(rendertype, new ByteBufferBuilder(rendertype.bufferSize()));
-        }
-    });
+
     private final BlockColors blockColors;
     private final LiquidRenderer liquidRenderer;
     private final NormalRenderer normalRenderer;
@@ -46,7 +42,7 @@ public class BlockRenderAllocator {
         this.blockModelShaper = blockModelShaper;
     }
 
-    public Map<RenderType, BufferBuilder> renderBlockLayer(Map<RenderType, BufferBuilder> map, BlockAndTintGetter getter, BlockState blockState, BlockPos blockPos, PoseStack poseStack) {
+    public Map<RenderType, BufferBuilder> renderBlockLayer(Map<RenderType, BufferBuilder> buffers, BlockAndTintGetter getter, BlockState blockState, BlockPos blockPos, PoseStack poseStack) {
 //                if (blockState.is(Blocks.AIR)) return;
 //                if (blockState.isSolidRender(getter, blockpos2)) {
 //                    visgraph.setOpaque(blockpos2);
@@ -64,7 +60,7 @@ public class BlockRenderAllocator {
         FluidState fluidstate = blockState.getFluidState();
         if (!fluidstate.isEmpty()) {
             RenderType liquidRendertype = ItemBlockRenderTypes.getRenderLayer(fluidstate);
-            BufferBuilder bufferBuilder = this.getBuffer(map, liquidRendertype);
+            BufferBuilder bufferBuilder = this.getBuffer(buffers, liquidRendertype);
             liquidRenderer.renderLiquid(poseStack, getter, blockPos, bufferBuilder, blockState, fluidstate);
         }
 
@@ -79,20 +75,16 @@ public class BlockRenderAllocator {
             for (RenderType blockRendertype : model.getRenderTypes(blockState, randomSource, modelData)) {
                 poseStack.pushPose();
                 poseStack.translate((float) SectionPos.sectionRelative(blockPos.getX()), blockPos.getY(), (float) SectionPos.sectionRelative(blockPos.getZ()));
-                BufferBuilder bufferBuilder = this.getBuffer(map, blockRendertype);
+                BufferBuilder bufferBuilder = this.getBuffer(buffers, blockRendertype);
                 normalRenderer.tesselateBlock(getter, model, blockState, blockPos, poseStack, bufferBuilder, true, randomSource, blockState.getSeed(blockPos), OverlayTexture.NO_OVERLAY, modelData, blockRendertype);
                 poseStack.popPose();
             }
         }
         poseStack.popPose();
-        return map;
+        return buffers;
     }
 
     public BufferBuilder getBuffer(Map<RenderType, BufferBuilder> map, @NotNull RenderType renderType) {
-        return map.computeIfAbsent(renderType, lambdaType -> new BufferBuilder(getByteBuffer(renderType), VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK));
-    }
-
-    public ByteBufferBuilder getByteBuffer(@NotNull RenderType renderType) {
-        return buffers.computeIfAbsent(renderType, type -> new ByteBufferBuilder(type.bufferSize()));
+        return map.computeIfAbsent(renderType, type -> new BufferBuilder(new ByteBufferBuilder(type.bufferSize), VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK));
     }
 }

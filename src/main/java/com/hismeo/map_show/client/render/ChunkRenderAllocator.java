@@ -10,6 +10,7 @@ import com.mojang.blaze3d.vertex.*;
 import it.unimi.dsi.fastutil.objects.Object2ObjectFunction;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectArrayMap;
+import net.minecraft.Util;
 import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.block.BlockModelShaper;
@@ -17,6 +18,7 @@ import net.minecraft.client.renderer.block.ModelBlockRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.state.BlockState;
+import org.joml.Matrix4f;
 
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -43,7 +45,7 @@ public class ChunkRenderAllocator {
         int radius = source.chunkRadius();
         ModelBlockRenderer.enableCaching();
 
-        if (true) {
+        if (false) {
             //DEBUG
             renderSingleChunk(poseStack, source.getChunk(viewCenterX, viewCenterZ));
         } else {
@@ -68,13 +70,13 @@ public class ChunkRenderAllocator {
     protected void renderSingleChunk(PoseStack poseStack, MapChunk chunk) {
         renderingChunk.computeIfAbsent(chunk.getPos(), pos -> {
             RenderedChunk renderedChunk = new RenderedChunk((ChunkPos) pos);
-            var meshDataMap = buildChunkBuffer(poseStack, chunk);
+            var meshDataMap = buildChunkBuffer(new PoseStack(), chunk);
             uploadChunkVBO(meshDataMap, renderedChunk.renderLayer());
             return renderedChunk;
         });
 
         for (RenderedChunk renderedChunk : renderingChunk.values()) {
-            renderChunkVBO(renderedChunk.renderLayer());
+            renderChunkVBO(poseStack, renderedChunk.renderLayer());
         }
     }
 
@@ -83,19 +85,21 @@ public class ChunkRenderAllocator {
             BlockPos minPos = chunk.getPos().getWorldPosition().atY(mapLevel.getMinBuildHeight());
             BlockPos maxPos = minPos.offset(15, mapLevel.getHeight() - 1, 15);
 
-            var map = new Reference2ObjectArrayMap<RenderType, BufferBuilder>(RenderType.chunkBufferLayers().size());
+            var buffers = new Reference2ObjectArrayMap<RenderType, BufferBuilder>(RenderType.chunkBufferLayers().size());
             for (BlockPos blockPos : BlockPos.betweenClosed(minPos, maxPos)) {
                 BlockState blockstate = mapLevel.getBlockState(blockPos);
-                blockRenderAllocator.renderBlockLayer(map, mapLevel, blockstate, blockPos, poseStack);
+                blockRenderAllocator.renderBlockLayer(buffers, mapLevel, blockstate, blockPos, poseStack);
             }
 
             var meshes = new Reference2ObjectArrayMap<RenderType, MeshData>();
-            map.forEach((renderType, bufferBuilder) -> {
+            buffers.forEach((renderType, bufferBuilder) -> {
                 MeshData meshData = bufferBuilder.build();
                 if (meshData != null) {
                     meshes.put(renderType, meshData);
                 }
             });
+
+            buffers.clear();
             return meshes;
         }
         return ImmutableMap.of();
@@ -109,18 +113,18 @@ public class ChunkRenderAllocator {
             } else {
                 vertexBuffer.bind();
                 vertexBuffer.upload(meshData);
-                vertexBuffer.drawWithShader(RenderSystem.getModelViewMatrix(), RenderSystem.getProjectionMatrix(), RenderSystem.getShader());
                 VertexBuffer.unbind();
             }
         });
     }
 
-    protected void renderChunkVBO(Map<RenderType, VertexBuffer> renderLayer) {
+    protected void renderChunkVBO(PoseStack poseStack, Map<RenderType, VertexBuffer> renderLayer) {
         renderLayer.forEach((renderType, vertexBuffer) -> {
             if (vertexBuffer.isInvalid() || vertexBuffer.mode == null || vertexBuffer.getIndexType() == null) return;
             renderType.setupRenderState();
             vertexBuffer.bind();
-            vertexBuffer.drawWithShader(RenderSystem.getModelViewMatrix(), RenderSystem.getProjectionMatrix(), RenderSystem.getShader());
+            Matrix4f modelViewMatrix = new Matrix4f(RenderSystem.getModelViewMatrix()).mul(poseStack.last().pose());
+            vertexBuffer.drawWithShader(modelViewMatrix, RenderSystem.getProjectionMatrix(), RenderSystem.getShader());
             VertexBuffer.unbind();
             renderType.clearRenderState();
         });
