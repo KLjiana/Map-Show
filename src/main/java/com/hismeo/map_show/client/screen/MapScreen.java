@@ -80,6 +80,9 @@ public class MapScreen extends Screen {
         guiGraphics.drawString(font, "scale: %s, %s".formatted(scale.getNumber(), scale.getoNumber()), 0, 50, 0xFFFFFF, false);
 
         guiGraphics.drawString(font, "partialTick: %s".formatted(partialTick), 0, 65, 0xFFFFFF, false);
+
+        guiGraphics.drawString(font, "viewCenterX: %s".formatted(mapLevel.getChunkSource().viewCenterX()), 0, 80, 0xFFFFFF, false);
+        guiGraphics.drawString(font, "viewCenterZ: %s".formatted(mapLevel.getChunkSource().viewCenterZ()), 0, 90, 0xFFFFFF, false);
     }
 
 

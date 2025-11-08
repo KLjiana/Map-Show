@@ -48,6 +48,8 @@ public class ChunkRenderAllocator {
         if (false) {
             //DEBUG
             renderSingleChunk(poseStack, source.getChunk(viewCenterX, viewCenterZ));
+            poseStack.translate(0, 0, 16);
+            renderSingleChunk(poseStack, source.getChunk(viewCenterX, viewCenterZ + 1));
         } else {
             //TODO CACHE!!!!
             for (int dx = -radius; dx <= radius; dx++) {
@@ -75,9 +77,7 @@ public class ChunkRenderAllocator {
             return renderedChunk;
         });
 
-        for (RenderedChunk renderedChunk : renderingChunk.values()) {
-            renderChunkVBO(poseStack, renderedChunk.renderLayer());
-        }
+        renderChunkVBO(poseStack, renderingChunk.get(chunk.getPos()).renderLayer());
     }
 
     protected Map<RenderType, MeshData> buildChunkBuffer(PoseStack poseStack, MapChunk chunk) {

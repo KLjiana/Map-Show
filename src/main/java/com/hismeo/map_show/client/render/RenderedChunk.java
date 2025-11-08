@@ -7,11 +7,16 @@ import net.minecraft.world.level.ChunkPos;
 
 import java.util.Map;
 
-public record RenderedChunk(ChunkPos chunkPos, Map<RenderType, VertexBuffer> renderLayer) {
+public record RenderedChunk(ChunkPos chunkPos, Map<RenderType, VertexBuffer> renderLayer) implements AutoCloseable {
     public RenderedChunk(ChunkPos chunkPos) {
         this(chunkPos, new Reference2ObjectOpenHashMap<>());
         for (RenderType chunkBufferLayer : RenderType.chunkBufferLayers()) {
             renderLayer.put(chunkBufferLayer, new VertexBuffer(VertexBuffer.Usage.STATIC));
         }
+    }
+
+    @Override
+    public void close() {
+        renderLayer.clear();
     }
 }
