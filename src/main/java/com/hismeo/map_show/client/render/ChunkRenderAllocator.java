@@ -23,6 +23,9 @@ import org.joml.Matrix4f;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+//TODO 初始加载卡顿优化
+//TODO 切换世界时缓冲区为清除（疑似共用？
+//TODO 是否有不必要的实例创建
 public class ChunkRenderAllocator {
     private final BlockRenderAllocator blockRenderAllocator;
     private final MapLevel mapLevel;
@@ -76,6 +79,7 @@ public class ChunkRenderAllocator {
             uploadChunkVBO(meshDataMap, renderedChunk.renderLayer());
             return renderedChunk;
         });
+
 
         renderChunkVBO(poseStack, renderingChunk.get(chunk.getPos()).renderLayer());
     }
