@@ -74,7 +74,7 @@ public class BlockRenderAllocator {
             //TODO vertexsort
             for (RenderType blockRendertype : model.getRenderTypes(blockState, randomSource, modelData)) {
                 poseStack.pushPose();
-                poseStack.translate((float) SectionPos.sectionRelative(blockPos.getX()), blockPos.getY(), (float) SectionPos.sectionRelative(blockPos.getZ()));
+                poseStack.translate(blockPos.getX(), blockPos.getY(), blockPos.getZ());
                 BufferBuilder bufferBuilder = this.getBuffer(buffers, blockRendertype);
                 normalRenderer.tesselateBlock(getter, model, blockState, blockPos, poseStack, bufferBuilder, true, randomSource, blockState.getSeed(blockPos), OverlayTexture.NO_OVERLAY, modelData, blockRendertype);
                 poseStack.popPose();

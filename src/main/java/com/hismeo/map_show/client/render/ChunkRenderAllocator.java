@@ -19,6 +19,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.state.BlockState;
 import org.joml.Matrix4f;
+import org.joml.Vector3f;
 
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -26,6 +27,7 @@ import java.util.stream.Collectors;
 //TODO 初始加载卡顿优化
 //TODO 切换世界时缓冲区为清除（疑似共用？
 //TODO 是否有不必要的实例创建
+//TODO 半透明提取 单独提交（排序
 public class ChunkRenderAllocator {
     private final BlockRenderAllocator blockRenderAllocator;
     private final MapLevel mapLevel;
@@ -41,7 +43,7 @@ public class ChunkRenderAllocator {
     }
 
     //TODO CACHE
-    public void renderCurrentChunk(PoseStack poseStack) {
+    public void renderCurrentChunk(PoseStack poseStack, Vector3f cameraPos) {
         MapChunkCache source = mapLevel.getChunkSource();
         int viewCenterX = source.viewCenterX();
         int viewCenterZ = source.viewCenterZ();
@@ -50,11 +52,10 @@ public class ChunkRenderAllocator {
 
         if (false) {
             //DEBUG
-            renderSingleChunk(poseStack, source.getChunk(viewCenterX, viewCenterZ));
-            poseStack.translate(0, 0, 16);
-            renderSingleChunk(poseStack, source.getChunk(viewCenterX, viewCenterZ + 1));
+            renderSingleChunk(poseStack, source.getChunk(viewCenterX, viewCenterZ), cameraPos);
+//            poseStack.translate(0, 0, 16);
+            renderSingleChunk(poseStack, source.getChunk(viewCenterX, viewCenterZ + 1), cameraPos);
         } else {
-            //TODO CACHE!!!!
             for (int dx = -radius; dx <= radius; dx++) {
                 for (int dz = -radius; dz <= radius; dz++) {
                     int chunkX = viewCenterX + dx;
@@ -63,8 +64,8 @@ public class ChunkRenderAllocator {
                     if (chunk == null) continue;
 
                     poseStack.pushPose();
-                    poseStack.translate(dx * 16, 0, dz * 16);
-                    renderSingleChunk(poseStack, chunk);
+//                    poseStack.translate(dx * 16, 0, dz * 16);
+                    renderSingleChunk(poseStack, chunk, cameraPos);
                     poseStack.popPose();
                 }
             }
@@ -72,10 +73,10 @@ public class ChunkRenderAllocator {
         ModelBlockRenderer.clearCache();
     }
 
-    protected void renderSingleChunk(PoseStack poseStack, MapChunk chunk) {
+    protected void renderSingleChunk(PoseStack poseStack, MapChunk chunk, Vector3f cameraPos) {
         renderingChunk.computeIfAbsent(chunk.getPos(), pos -> {
             RenderedChunk renderedChunk = new RenderedChunk((ChunkPos) pos);
-            var meshDataMap = buildChunkBuffer(new PoseStack(), chunk);
+            var meshDataMap = buildChunkBuffer(new PoseStack(), chunk, cameraPos);
             uploadChunkVBO(meshDataMap, renderedChunk.renderLayer());
             return renderedChunk;
         });
@@ -84,18 +85,19 @@ public class ChunkRenderAllocator {
         renderChunkVBO(poseStack, renderingChunk.get(chunk.getPos()).renderLayer());
     }
 
-    protected Map<RenderType, MeshData> buildChunkBuffer(PoseStack poseStack, MapChunk chunk) {
+    protected Map<RenderType, MeshData> buildChunkBuffer(PoseStack poseStack, MapChunk chunk, Vector3f cameraPos) {
         if (chunk != null) {
             BlockPos minPos = chunk.getPos().getWorldPosition().atY(mapLevel.getMinBuildHeight());
             BlockPos maxPos = minPos.offset(15, mapLevel.getHeight() - 1, 15);
 
             var buffers = new Reference2ObjectArrayMap<RenderType, BufferBuilder>(RenderType.chunkBufferLayers().size());
+            var meshes = new Reference2ObjectArrayMap<RenderType, MeshData>();
+
             for (BlockPos blockPos : BlockPos.betweenClosed(minPos, maxPos)) {
                 BlockState blockstate = mapLevel.getBlockState(blockPos);
                 blockRenderAllocator.renderBlockLayer(buffers, mapLevel, blockstate, blockPos, poseStack);
             }
 
-            var meshes = new Reference2ObjectArrayMap<RenderType, MeshData>();
             buffers.forEach((renderType, bufferBuilder) -> {
                 MeshData meshData = bufferBuilder.build();
                 if (meshData != null) {

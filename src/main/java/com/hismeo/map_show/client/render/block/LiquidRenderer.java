@@ -81,9 +81,10 @@ public class LiquidRenderer {
                 f10 = this.calculateAverageHeight(level, fluid, height, southHeight, westHeight, pos.relative(Direction.SOUTH).relative(Direction.WEST));
             }
 
-            float x = (float) (pos.getX() & 15);
-            float y = (float) (pos.getY());
-            float z = (float) (pos.getZ() & 15);
+            //blockPos
+            float x = (float) pos.getX();
+            float y = (float) pos.getY();
+            float z = (float) pos.getZ();
             float f39 = 0.001F;
             float f16 = renderDown ? 0.001F : 0.0F;
             if (renderTop && !isFaceOccludedByNeighbor(level, pos, Direction.UP, Math.min(Math.min(f8, f10), Math.min(f9, f7)), upBlockState)) {
