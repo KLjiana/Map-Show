@@ -44,6 +44,7 @@ public class ClientMap {
 
     private static long biomeZoomSeed;
 
+    /// 优先用于获取当前维度
     public static MapLevel getCurrentLevel(ClientLevel level) {
         if (currentLevel == null || currentLevel.dimension != level.dimension()) {
             levels.put(level.dimension(), currentLevel = new MapLevel(level, getViewDistance()));
@@ -51,6 +52,7 @@ public class ClientMap {
         return currentLevel;
     }
 
+    /// 优先用于获取其它维度
     public static @Nullable MapLevel getLevel(ResourceKey<Level> dimension) {
         if (currentLevel != null && currentLevel.dimension == dimension) {
             return currentLevel;
@@ -149,7 +151,13 @@ public class ClientMap {
             if (oldLevel == null) return;
             MapData data = oldLevel.asData();
             mapData.put(data.dimension(), data);
-            // todo 保存 data
+        }
+
+        @SubscribeEvent
+        public static void clientPlayerNetwork$LoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
+            // todo 保存
+            levels.clear();
+            mapData.clear();
         }
     }
 }
