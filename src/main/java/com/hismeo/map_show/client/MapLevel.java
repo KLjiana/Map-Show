@@ -1,14 +1,14 @@
 package com.hismeo.map_show.client;
 
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.DimensionSpecialEffects;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
+import net.minecraft.core.*;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ChunkResult;
-import net.minecraft.world.level.BlockAndTintGetter;
-import net.minecraft.world.level.ColorResolver;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.level.*;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeManager;
+import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -23,7 +23,7 @@ import java.util.concurrent.CompletableFuture;
 /**
  * @see net.minecraft.client.multiplayer.ClientLevel
  */
-public class MapLevel implements BlockAndTintGetter {
+public class MapLevel implements BlockAndTintGetter, BiomeManager.NoiseBiomeSource {
     protected final ResourceKey<Level> dimension;
     protected final MapChunkCache chunkSource;
     protected final DimensionSpecialEffects effects;
@@ -31,13 +31,46 @@ public class MapLevel implements BlockAndTintGetter {
     private final int minBuildHeight;
 
     private final List<CompletableFuture<ChunkResult<MapChunk>>> scheduledDropChunks = new ArrayList<>();
+    private final BiomeManager biomeManager;
+    private final IBlockTintGetter blockTintGetter;
+    private final RegistryAccess registryAccess;
 
-    public MapLevel(ResourceKey<Level> dimension, DimensionSpecialEffects effects, int viewDistance, int height, int minBuildHeight) {
-        this.dimension = dimension;
+    /**
+     * 当前玩家所处世界以外的世界渲染
+     */
+    public MapLevel(MapData data, int viewDistance, long biomeZoomSeed) {
+        this.dimension = data.dimension();
         this.chunkSource = new MapChunkCache(this, viewDistance);
-        this.effects = effects;
-        this.height = height;
-        this.minBuildHeight = minBuildHeight;
+        this.effects = data.effects();
+        this.height = data.height();
+        this.minBuildHeight = data.minBuildHeight();
+        this.biomeManager = new BiomeManager(this, biomeZoomSeed);
+        this.blockTintGetter = new WithoutLevelBlockTintGetter(pos -> biomeManager.getBiome(pos).value());
+        this.registryAccess = data.registryAccess();
+    }
+
+    /**
+     * 基于当前玩家所处世界进行渲染
+     */
+    public MapLevel(ClientLevel level, int viewDistance) {
+        this.dimension = level.dimension();
+        this.chunkSource = new MapChunkCache(this, viewDistance);
+        this.effects = level.effects();
+        this.height = level.getHeight();
+        this.minBuildHeight = level.getMinBuildHeight();
+        this.biomeManager = level.getBiomeManager();
+        this.blockTintGetter = level::getBlockTint;
+        this.registryAccess = level.registryAccess();
+    }
+
+    public MapData asData() {
+        return new MapData(
+                dimension,
+                effects,
+                height,
+                minBuildHeight,
+                registryAccess
+        );
     }
 
     @Override
@@ -71,7 +104,7 @@ public class MapLevel implements BlockAndTintGetter {
 
     @Override
     public int getBlockTint(BlockPos blockPos, ColorResolver colorResolver) {
-        return 0x77DD77; // todo
+        return blockTintGetter.getBlockTint(blockPos, colorResolver);
     }
 
     @Override
@@ -113,6 +146,14 @@ public class MapLevel implements BlockAndTintGetter {
     }
 
     public void onChunkLoaded(MapChunk chunk) {
+        blockTintGetter.onChunkLoaded(chunk.pos);
         chunk.scheduledForDrop = false;
+    }
+
+    /// @see LevelReader#getNoiseBiome(int, int, int)
+    @Override
+    public Holder<Biome> getNoiseBiome(int x, int y, int z) {
+        MapChunk chunk = chunkSource.getChunk(QuartPos.toSection(x), QuartPos.toSection(z));
+        return chunk == null ? registryAccess.holderOrThrow(Biomes.PLAINS) : chunk.getNoiseBiome(x, y, z);
     }
 }

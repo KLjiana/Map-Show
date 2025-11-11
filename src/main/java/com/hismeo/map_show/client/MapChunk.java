@@ -4,8 +4,13 @@ import net.minecraft.CrashReport;
 import net.minecraft.CrashReportCategory;
 import net.minecraft.ReportedException;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.QuartPos;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeManager;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -18,7 +23,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * @see net.minecraft.world.level.chunk.LevelChunk
  */
-public class MapChunk implements BlockGetter {
+public class MapChunk implements BlockGetter, BiomeManager.NoiseBiomeSource {
     protected final MapLevel level;
     protected final ChunkPos pos;
     protected final MapChunkSection[] sections;
@@ -32,6 +37,10 @@ public class MapChunk implements BlockGetter {
 
     public ChunkPos getPos() {
         return pos;
+    }
+
+    public MapChunkSection[] getSections() {
+        return sections;
     }
 
     @Override
@@ -93,6 +102,16 @@ public class MapChunk implements BlockGetter {
     @Override
     public int getMinBuildHeight() {
         return level.getMinBuildHeight();
+    }
+
+    /// @see ChunkAccess#getNoiseBiome(int, int, int)
+    @Override
+    public Holder<Biome> getNoiseBiome(int x, int y, int z) {
+        int i = QuartPos.fromBlock(getMinBuildHeight());
+        int k = i + QuartPos.fromBlock(getHeight()) - 1;
+        int l = Mth.clamp(y, i, k);
+        int j = getSectionIndex(QuartPos.toBlock(l));
+        return sections[j].getNoiseBiome(x & 3, l & 3, z & 3);
     }
 
     public static MapChunk fromVanilla(MapLevel level, ChunkAccess chunkAccess, boolean copy) {
