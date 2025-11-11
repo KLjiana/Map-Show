@@ -2,7 +2,6 @@ package com.hismeo.map_show.client;
 
 import com.hismeo.map_show.MapShow;
 import com.hismeo.map_show.client.screen.MapScreen;
-import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -29,18 +28,20 @@ import net.neoforged.neoforge.event.level.ChunkEvent;
 import org.jetbrains.annotations.Nullable;
 
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.Objects;
 
 import static com.hismeo.map_show.client.MapChunkCache.isValidChunk;
 
 public class ClientMap {
-    private static final Object2ObjectMap<ResourceKey<Level>, MapLevel> levels = new Object2ObjectOpenHashMap<>();
-    private static final Object2ObjectMap<ResourceKey<Level>, MapData> mapData = new Object2ObjectOpenHashMap<>();
+    private static final Map<ResourceKey<Level>, MapLevel> levels = new Object2ObjectOpenHashMap<>();
+    private static final Map<ResourceKey<Level>, MapData> mapData = new Object2ObjectOpenHashMap<>();
+    private static final Map<ResourceKey<Level>, MapSerializer> serializers = new Object2ObjectOpenHashMap<>();
     private static @Nullable MapLevel currentLevel;
+
     private static String levelName;
     private static Path rootDir;
     private static Path saveDir;
-    private static MapSerializer serializer;
 
     private static long biomeZoomSeed;
 
@@ -82,6 +83,13 @@ public class ClientMap {
         return Minecraft.getInstance().options.serverRenderDistance;
     }
 
+    private static MapSerializer getOrCreateSerializer(ResourceKey<Level> dimension) {
+        return serializers.computeIfAbsent(dimension, dim -> {
+            Path region = DimensionType.getStorageFolder(dim, saveDir).resolve("region");
+            return new MapSerializer(levelName, dim, region);
+        });
+    }
+
     @EventBusSubscriber(modid = MapShow.MODID, value = Dist.CLIENT)
     public static class Events {
         @SubscribeEvent
@@ -112,6 +120,7 @@ public class ClientMap {
                     int index = storage.getIndex(pos.x, pos.z);
                     MapChunk chunk = storage.getChunk(index);
                     if (isValidChunk(chunk, pos.x, pos.z)) {
+                        getOrCreateSerializer(level.dimension()).save(chunk, level.registryAccess()); // todo 改为一并保存而不是一个个保存
                         storage.replace(index, chunk, null);
                     }
                 }
@@ -132,10 +141,10 @@ public class ClientMap {
                     levelName = serverData.ip.replace('.', '_');
                 }
             }
+
             rootDir = FMLPaths.GAMEDIR.get().resolve(MapShow.MODID);
             saveDir = rootDir.resolve(levelName);
-            ResourceKey<Level> dimension = event.getPlayer().level().dimension();
-            serializer = new MapSerializer(levelName, dimension, DimensionType.getStorageFolder(dimension, saveDir).resolve("region"));
+            getOrCreateSerializer(event.getPlayer().level().dimension());
 
             /// @see ServerPlayer#createCommonSpawnInfo(ServerLevel)
             /// @see ClientPacketListener#handleLogin(ClientboundLoginPacket)
@@ -149,8 +158,8 @@ public class ClientMap {
             MapLevel neoLevel = new MapLevel(event.getNewPlayer().clientLevel, getViewDistance());
             MapLevel oldLevel = setLevel(neoLevel);
             if (oldLevel == null) return;
-            MapData data = oldLevel.asData();
-            mapData.put(data.dimension(), data);
+            mapData.put(oldLevel.dimension, oldLevel.asData());
+            getOrCreateSerializer(oldLevel.dimension); // todo save
         }
 
         @SubscribeEvent
@@ -158,6 +167,7 @@ public class ClientMap {
             // todo 保存
             levels.clear();
             mapData.clear();
+            serializers.clear();
         }
     }
 }

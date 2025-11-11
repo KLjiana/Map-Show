@@ -4,7 +4,6 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.DimensionSpecialEffects;
 import net.minecraft.core.*;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.server.level.ChunkResult;
 import net.minecraft.world.level.*;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeManager;
@@ -16,10 +15,6 @@ import net.minecraft.world.level.lighting.LevelLightEngine;
 import net.minecraft.world.level.material.FluidState;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-
 /**
  * @see net.minecraft.client.multiplayer.ClientLevel
  */
@@ -30,7 +25,6 @@ public class MapLevel implements BlockAndTintGetter, BiomeManager.NoiseBiomeSour
     private final int height;
     private final int minBuildHeight;
 
-    private final List<CompletableFuture<ChunkResult<MapChunk>>> scheduledDropChunks = new ArrayList<>();
     private final BiomeManager biomeManager;
     private final IBlockTintGetter blockTintGetter;
     private final RegistryAccess registryAccess;
@@ -71,6 +65,10 @@ public class MapLevel implements BlockAndTintGetter, BiomeManager.NoiseBiomeSour
                 minBuildHeight,
                 registryAccess
         );
+    }
+
+    public RegistryAccess registryAccess() {
+        return registryAccess;
     }
 
     @Override

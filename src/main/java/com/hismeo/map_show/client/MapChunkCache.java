@@ -68,10 +68,9 @@ public class MapChunkCache {
     static boolean isValidChunk(@Nullable MapChunk chunk, int x, int z) {
         if (chunk == null) {
             return false;
-        } else {
-            ChunkPos chunkpos = chunk.getPos();
-            return chunkpos.x == x && chunkpos.z == z;
         }
+        ChunkPos chunkpos = chunk.getPos();
+        return chunkpos.x == x && chunkpos.z == z;
     }
 
     private static int calculateStorageRange(int viewDistance) {
