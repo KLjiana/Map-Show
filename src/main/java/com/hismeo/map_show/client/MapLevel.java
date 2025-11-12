@@ -139,13 +139,14 @@ public class MapLevel implements BlockAndTintGetter, BiomeManager.NoiseBiomeSour
     }
 
     public void unload(MapChunk chunk) {
-        chunk.scheduledForDrop = true;
-
+        chunkSource.pendingSaveChunks.add(chunk);
+        chunkSource.visibleMapChunks.remove(chunk.pos.toLong());
     }
 
     public void onChunkLoaded(MapChunk chunk) {
         blockTintGetter.onChunkLoaded(chunk.pos);
-        chunk.scheduledForDrop = false;
+        chunkSource.pendingSaveChunks.remove(chunk);
+        chunkSource.visibleMapChunks.put(chunk.pos.toLong(), chunk);
     }
 
     /// @see LevelReader#getNoiseBiome(int, int, int)

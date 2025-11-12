@@ -1,21 +1,54 @@
 package com.hismeo.map_show.client;
 
+import it.unimi.dsi.fastutil.longs.Long2ByteMap;
+import it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayDeque;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
-/**
- * @see net.minecraft.client.multiplayer.ClientChunkCache
- */
+/// @see net.minecraft.client.multiplayer.ClientChunkCache
+/// @see net.minecraft.server.level.ChunkMap
 public class MapChunkCache {
+    private static final int SAVE_TICK = 200;
+    private static final byte CHUNK_TYPE_REPLACEABLE = -1;
+    private static final byte CHUNK_TYPE_UNKNOWN = 0;
+    private static final byte CHUNK_TYPE_FULL = 1;
     volatile Storage storage;
     final MapLevel level;
+    final ArrayDeque<MapChunk> pendingSaveChunks = new ArrayDeque<>();
+    final Long2ObjectMap<MapChunk> visibleMapChunks = new Long2ObjectLinkedOpenHashMap<>();
+    private final Long2ObjectMap<CompletableFuture<MapChunk>> scheduledLoadingChunks = new Long2ObjectLinkedOpenHashMap<>();
+    private final Long2ByteMap chunkTypeCache = new Long2ByteOpenHashMap();
+    private int saveTick = SAVE_TICK;
 
     public MapChunkCache(MapLevel level, int viewDistance) {
         this.level = level;
         this.storage = new Storage(calculateStorageRange(viewDistance));
+    }
+
+    public void tick() {
+        if (--this.saveTick > 0) return;
+        this.saveTick = SAVE_TICK;
+        while (!pendingSaveChunks.isEmpty()) {
+            MapChunk chunk = pendingSaveChunks.remove();
+            ClientMap.getOrCreateSerializer(level.dimension).scheduleUnload(chunk);
+        }
+    }
+
+    public void drop(ChunkPos pos) {
+        if (storage.inRange(pos.x, pos.z)) {
+            int index = storage.getIndex(pos.x, pos.z);
+            MapChunk chunk = storage.getChunk(index);
+            if (isValidChunk(chunk, pos.x, pos.z)) {
+                storage.replace(index, chunk, null);
+            }
+        }
     }
 
     public void updateViewCenter(int x, int z) {
@@ -45,16 +78,21 @@ public class MapChunkCache {
         }
     }
 
+    /// 从原版获取区块
+    ///
+    /// @return 新获取的区块
     public @Nullable MapChunk setChunk(ChunkAccess chunkAccess, boolean copy) {
         ChunkPos pos = chunkAccess.getPos();
         if (storage.inRange(pos.x, pos.z)) {
             MapChunk chunk = MapChunk.fromVanilla(level, chunkAccess, copy);
             storage.replace(storage.getIndex(pos.x, pos.z), chunk);
+            chunkTypeCache.put(pos.toLong(), CHUNK_TYPE_FULL);
             return chunk;
         }
         return null;
     }
 
+    /// 获取正在动态更新的区块
     public @Nullable MapChunk getChunk(int x, int z) {
         if (storage.inRange(x, z)) {
             MapChunk chunk = storage.getChunk(storage.getIndex(x, z));
@@ -63,6 +101,36 @@ public class MapChunkCache {
             }
         }
         return null;
+    }
+
+    /// 获取所有可见的区块
+    ///
+    /// @param load 设置为true时，如果缓存中没有则立刻开始读取，且不阻塞
+    public @Nullable MapChunk getVisibleChunk(int x, int z, boolean load) {
+        long l = ChunkPos.asLong(x, z);
+        MapChunk chunk = visibleMapChunks.get(l);
+        if (chunk == null && load) {
+            byte type = chunkTypeCache.get(l);
+            if (type == CHUNK_TYPE_UNKNOWN || type == CHUNK_TYPE_REPLACEABLE) return null;
+
+            CompletableFuture<MapChunk> task = scheduledLoadingChunks.computeIfAbsent(l, j -> {
+                MapSerializer serializer = ClientMap.getOrCreateSerializer(level.dimension);
+                return serializer.scheduleChunkLoad(level, new ChunkPos(x, z));
+            });
+            if (task == MapSerializer.FAILED_TO_LOAD_MAP_CHUNK) {
+                chunkTypeCache.put(l, CHUNK_TYPE_REPLACEABLE);
+                return null;
+            }
+            chunk = task.getNow(null);
+            if (chunk == MapSerializer.UNKNOWN_MAP_CHUNK) {
+                chunkTypeCache.put(l, CHUNK_TYPE_UNKNOWN);
+            } else {
+                visibleMapChunks.put(l, chunk);
+                scheduledLoadingChunks.remove(l);
+                chunkTypeCache.put(l, CHUNK_TYPE_FULL);
+            }
+        }
+        return chunk;
     }
 
     static boolean isValidChunk(@Nullable MapChunk chunk, int x, int z) {
@@ -124,7 +192,7 @@ public class MapChunkCache {
         }
 
         MapChunk replace(int chunkIndex, MapChunk chunk, @Nullable MapChunk replaceWith) {
-            if (this.chunks.compareAndSet(chunkIndex, chunk, replaceWith) && replaceWith == null) {
+            if (chunks.compareAndSet(chunkIndex, chunk, replaceWith) && replaceWith == null) {
                 this.chunkCount--;
             }
 
@@ -136,8 +204,7 @@ public class MapChunkCache {
             return Math.abs(x - viewCenterX) <= chunkRadius && Math.abs(z - viewCenterZ) <= chunkRadius;
         }
 
-        @Nullable
-        MapChunk getChunk(int chunkIndex) {
+        @Nullable MapChunk getChunk(int chunkIndex) {
             return chunks.get(chunkIndex);
         }
     }

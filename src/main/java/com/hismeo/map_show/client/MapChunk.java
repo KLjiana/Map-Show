@@ -1,8 +1,5 @@
 package com.hismeo.map_show.client;
 
-import net.minecraft.CrashReport;
-import net.minecraft.CrashReportCategory;
-import net.minecraft.ReportedException;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;
@@ -27,7 +24,7 @@ public class MapChunk implements BlockGetter, BiomeManager.NoiseBiomeSource {
     protected final MapLevel level;
     protected final ChunkPos pos;
     protected final MapChunkSection[] sections;
-    protected boolean scheduledForDrop;
+    protected boolean fromVanilla = false;
 
     public MapChunk(MapLevel level, ChunkPos pos, MapChunkSection[] sections) {
         this.level = level;
@@ -43,6 +40,10 @@ public class MapChunk implements BlockGetter, BiomeManager.NoiseBiomeSource {
         return sections;
     }
 
+    public boolean isFromVanilla() {
+        return fromVanilla;
+    }
+
     @Override
     public @Nullable BlockEntity getBlockEntity(BlockPos pos) {
         return null;
@@ -50,25 +51,17 @@ public class MapChunk implements BlockGetter, BiomeManager.NoiseBiomeSource {
 
     @Override
     public BlockState getBlockState(BlockPos pos) {
-        int i = pos.getX();
-        int j = pos.getY();
-        int k = pos.getZ();
-        try {
-            int l = this.getSectionIndex(j);
-            if (l >= 0 && l < this.sections.length) {
-                MapChunkSection section = this.sections[l];
-                //if (!section.hasOnlyAir()) {
-                return section.getBlockState(i & 15, j & 15, k & 15);
-                //}
+        int x = pos.getX();
+        int y = pos.getY();
+        int z = pos.getZ();
+        int index = this.getSectionIndex(y);
+        if (index >= 0 && index < sections.length) {
+            MapChunkSection section = sections[index];
+            if (!section.hasOnlyAir()) {
+                return section.getBlockState(x & 15, y & 15, z & 15);
             }
-
-            return Blocks.AIR.defaultBlockState();
-        } catch (Throwable throwable) {
-            CrashReport crashreport = CrashReport.forThrowable(throwable, "Getting block state");
-            CrashReportCategory crashreportcategory = crashreport.addCategory("Block being got");
-            crashreportcategory.setDetail("Location", () -> CrashReportCategory.formatLocation(this, i, j, k));
-            throw new ReportedException(crashreport);
         }
+        return Blocks.AIR.defaultBlockState();
     }
 
     @Override
@@ -76,22 +69,14 @@ public class MapChunk implements BlockGetter, BiomeManager.NoiseBiomeSource {
         int x = pos.getX();
         int y = pos.getY();
         int z = pos.getZ();
-        try {
-            int i = this.getSectionIndex(y);
-            if (i >= 0 && i < this.sections.length) {
-                MapChunkSection section = this.sections[i];
-                //if (!section.hasOnlyAir()) {
+        int index = this.getSectionIndex(y);
+        if (index >= 0 && index < sections.length) {
+            MapChunkSection section = sections[index];
+            if (!section.hasOnlyAir()) {
                 return section.getFluidState(x & 15, y & 15, z & 15);
-                //}
             }
-
-            return Fluids.EMPTY.defaultFluidState();
-        } catch (Throwable throwable) {
-            CrashReport crashreport = CrashReport.forThrowable(throwable, "Getting fluid state");
-            CrashReportCategory crashreportcategory = crashreport.addCategory("Block being got");
-            crashreportcategory.setDetail("Location", () -> CrashReportCategory.formatLocation(this, x, y, z));
-            throw new ReportedException(crashreport);
         }
+        return Fluids.EMPTY.defaultFluidState();
     }
 
     @Override
@@ -120,6 +105,8 @@ public class MapChunk implements BlockGetter, BiomeManager.NoiseBiomeSource {
         for (int i = 0; i < vanillaSections.length; i++) {
             sections[i] = MapChunkSection.fromVanilla(vanillaSections[i], copy);
         }
-        return new MapChunk(level, chunkAccess.getPos(), sections);
+        MapChunk chunk = new MapChunk(level, chunkAccess.getPos(), sections);
+        chunk.fromVanilla = true;
+        return chunk;
     }
 }

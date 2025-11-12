@@ -10,17 +10,31 @@ import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.PalettedContainer;
 import net.minecraft.world.level.chunk.PalettedContainerRO;
 import net.minecraft.world.level.material.FluidState;
+import org.apache.commons.lang3.mutable.MutableInt;
 
-import java.util.function.Predicate;
+import java.util.function.BooleanSupplier;
 
+/// 不允许对其进行setBlockState之类的操作
 /// @see LevelChunkSection
 public class MapChunkSection {
     private final PalettedContainer<BlockState> states;
     private PalettedContainerRO<Holder<Biome>> biomes;
+    private BooleanSupplier hasOnlyAirSupplier = () -> false;
 
     public MapChunkSection(PalettedContainer<BlockState> states, PalettedContainerRO<Holder<Biome>> biomes) {
         this.states = states;
         this.biomes = biomes;
+    }
+
+    /// 仅用于无法实时更新的情况
+    public void recalcBlockCounts() {
+        MutableInt nonEmptyBlockCount = new MutableInt();
+        states.count((state, count) -> {
+            if (state.isEmpty() && state.getFluidState().isEmpty()) return;
+            nonEmptyBlockCount.add(count);
+        });
+        boolean hasOnlyAir = nonEmptyBlockCount.intValue() == 0;
+        this.hasOnlyAirSupplier = () -> hasOnlyAir;
     }
 
     public PalettedContainer<BlockState> getStates() {
@@ -39,32 +53,8 @@ public class MapChunkSection {
         return states.get(x, y, z).getFluidState();
     }
 
-    public void acquire() {
-        states.acquire();
-    }
-
-    public void release() {
-        states.release();
-    }
-
-    public BlockState setBlockState(int x, int y, int z, BlockState state) {
-        return setBlockState(x, y, z, state, true);
-    }
-
-    public BlockState setBlockState(int x, int y, int z, BlockState state, boolean useLocks) {
-        if (useLocks) {
-            return states.getAndSet(x, y, z, state);
-        } else {
-            return states.getAndSetUnchecked(x, y, z, state);
-        }
-    }
-
-    public int getSerializedSize() {
-        return LevelChunkSection.BIOME_CONTAINER_BITS + states.getSerializedSize() + biomes.getSerializedSize();
-    }
-
-    public boolean maybeHas(Predicate<BlockState> predicate) {
-        return states.maybeHas(predicate);
+    public boolean hasOnlyAir() {
+        return hasOnlyAirSupplier.getAsBoolean();
     }
 
     public Holder<Biome> getNoiseBiome(int x, int y, int z) {
@@ -77,7 +67,9 @@ public class MapChunkSection {
     }
 
     public static MapChunkSection fromVanilla(LevelChunkSection levelChunkSection, boolean copy) {
+        PalettedContainer<BlockState> states = levelChunkSection.getStates();
         PalettedContainerRO<Holder<Biome>> biomes = levelChunkSection.getBiomes();
+        MapChunkSection section;
         if (copy) {
             /// @see ClientboundChunksBiomesPacket.ChunkBiomeData
             byte[] buffer = new byte[biomes.getSerializedSize()];
@@ -85,8 +77,12 @@ public class MapChunkSection {
             PalettedContainer<Holder<Biome>> neoBiomes = biomes.recreate();
             biomes.write(byteBuf);
             neoBiomes.read(byteBuf);
-            return new MapChunkSection(levelChunkSection.getStates().copy(), neoBiomes);
+            section = new MapChunkSection(states.copy(), neoBiomes);
+            section.recalcBlockCounts();
+        } else {
+            section = new MapChunkSection(states, biomes);
+            section.hasOnlyAirSupplier = levelChunkSection::hasOnlyAir;
         }
-        return new MapChunkSection(levelChunkSection.getStates(), biomes);
+        return section;
     }
 }

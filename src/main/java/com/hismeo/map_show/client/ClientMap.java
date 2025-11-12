@@ -7,13 +7,13 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.network.protocol.game.ClientboundLoginPacket;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.storage.LevelResource;
@@ -23,15 +23,15 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.ChunkEvent;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
-
-import static com.hismeo.map_show.client.MapChunkCache.isValidChunk;
 
 public class ClientMap {
     private static final Map<ResourceKey<Level>, MapLevel> levels = new Object2ObjectOpenHashMap<>();
@@ -78,12 +78,11 @@ public class ClientMap {
         return levels.put(level.dimension, level);
     }
 
-    // todo 随设置变动
     public static int getViewDistance() {
         return Minecraft.getInstance().options.serverRenderDistance;
     }
 
-    private static MapSerializer getOrCreateSerializer(ResourceKey<Level> dimension) {
+    public static MapSerializer getOrCreateSerializer(ResourceKey<Level> dimension) {
         return serializers.computeIfAbsent(dimension, dim -> {
             Path region = DimensionType.getStorageFolder(dim, saveDir).resolve("region");
             return new MapSerializer(levelName, dim, region);
@@ -114,16 +113,7 @@ public class ClientMap {
         @SubscribeEvent
         public static void chunk$Unload(ChunkEvent.Unload event) {
             if (event.getLevel() instanceof ClientLevel level) {
-                ChunkPos pos = event.getChunk().getPos();
-                MapChunkCache.Storage storage = getCurrentLevel(level).getChunkSource().storage;
-                if (storage.inRange(pos.x, pos.z)) {
-                    int index = storage.getIndex(pos.x, pos.z);
-                    MapChunk chunk = storage.getChunk(index);
-                    if (isValidChunk(chunk, pos.x, pos.z)) {
-                        getOrCreateSerializer(level.dimension()).save(chunk, level.registryAccess()); // todo 改为一并保存而不是一个个保存
-                        storage.replace(index, chunk, null);
-                    }
-                }
+                getCurrentLevel(level).getChunkSource().drop(event.getChunk().getPos());
             }
         }
 
@@ -144,7 +134,6 @@ public class ClientMap {
 
             rootDir = FMLPaths.GAMEDIR.get().resolve(MapShow.MODID);
             saveDir = rootDir.resolve(levelName);
-            getOrCreateSerializer(event.getPlayer().level().dimension());
 
             /// @see ServerPlayer#createCommonSpawnInfo(ServerLevel)
             /// @see ClientPacketListener#handleLogin(ClientboundLoginPacket)
@@ -159,15 +148,28 @@ public class ClientMap {
             MapLevel oldLevel = setLevel(neoLevel);
             if (oldLevel == null) return;
             mapData.put(oldLevel.dimension, oldLevel.asData());
-            getOrCreateSerializer(oldLevel.dimension); // todo save
+            getOrCreateSerializer(oldLevel.dimension).saveAllChunks(oldLevel, false);
         }
 
         @SubscribeEvent
-        public static void clientPlayerNetwork$LoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
-            // todo 保存
+        public static void clientPlayerNetwork$LoggingOut(ClientPlayerNetworkEvent.LoggingOut event) throws IOException {
+            LocalPlayer player = event.getPlayer();
+            if (player != null) {
+                MapLevel mapLevel = getCurrentLevel(player.clientLevel);
+                getOrCreateSerializer(mapLevel.dimension).saveAllChunks(mapLevel, true);
+            }
+            for (MapSerializer serializer : serializers.values()) {
+                serializer.close();
+            }
             levels.clear();
             mapData.clear();
             serializers.clear();
+        }
+
+        @SubscribeEvent
+        public static void clientTick$Post(ClientTickEvent.Post event) {
+            if (currentLevel == null) return;
+            currentLevel.chunkSource.tick();
         }
     }
 }
