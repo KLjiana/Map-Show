@@ -56,7 +56,6 @@ public class MapScreen extends Screen {
     public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         super.render(guiGraphics, mouseX, mouseY, partialTick);
         float deltaTicks = minecraft.getTimer() instanceof DeltaTracker.Timer timer ? timer.deltaTickResidual : partialTick;
-        renderDebugMessage(guiGraphics, deltaTicks);
 
         PoseStack poseStack = guiGraphics.pose();
         poseStack.pushPose();
@@ -70,6 +69,7 @@ public class MapScreen extends Screen {
         chunkRenderAllocator.renderCurrentChunk(poseStack, cameraPos.set(-xTran.getNumber(), -yTran.getNumber(), 0.0f));
 
         poseStack.popPose();
+        renderDebugMessage(guiGraphics, deltaTicks);
     }
 
     protected void renderDebugMessage(GuiGraphics guiGraphics, float partialTick) {
